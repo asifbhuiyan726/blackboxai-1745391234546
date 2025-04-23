@@ -1,0 +1,127 @@
+[run]
+branch = True
+source = .
+omit =
+    # Omit virtual environment
+    */venv/*
+    */env/*
+    
+    # Omit test files
+    */tests/*
+    */*test*.py
+    
+    # Omit migrations
+    */migrations/*
+    
+    # Omit settings and configuration files
+    */settings*.py
+    */asgi.py
+    */wsgi.py
+    manage.py
+    setup.py
+    
+    # Omit third-party packages
+    */site-packages/*
+    
+    # Omit documentation and static files
+    */docs/*
+    */static/*
+    */media/*
+    
+    # Omit development and deployment files
+    */docker/*
+    */.git/*
+    */.github/*
+    */scripts/*
+
+[report]
+exclude_lines =
+    # Have to re-enable the standard pragma
+    pragma: no cover
+
+    # Don't complain about missing debug-only code
+    def __repr__
+    if self\.debug
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    pass
+    raise ImportError
+    except ImportError:
+    
+    # Don't complain if tests don't hit defensive assertion code
+    raise AssertionError
+    raise NotImplementedError
+    
+    # Don't complain if non-runnable code isn't run
+    if 0:
+    if False:
+    if TYPE_CHECKING:
+    
+    # Don't complain about abstract methods
+    @abstractmethod
+    @abc.abstractmethod
+
+[html]
+directory = htmlcov
+title = BreakSphere Coverage Report
+
+[xml]
+output = coverage.xml
+
+[paths]
+source =
+    .
+    /app
+
+[html:directory]
+directory = htmlcov
+
+[json]
+output = coverage.json
+pretty_print = true
+
+[coverage:paths]
+source =
+    .
+    /app/
+    */site-packages/
+
+[coverage:run]
+relative_files = True
+dynamic_context = test_function
+data_file = .coverage
+parallel = True
+concurrency = multiprocessing
+plugins =
+    django_coverage_plugin
+
+[coverage:django]
+coverage_module = django_coverage_plugin
+coverage_options =
+    template_debug = True
+    template_timings = True
+
+[coverage:html]
+directory = htmlcov
+title = BreakSphere Coverage Report
+extra_css = 
+show_contexts = True
+skip_covered = False
+skip_empty = True
+
+[coverage:xml]
+output = coverage.xml
+package_depth = 99
+
+[coverage:json]
+output = coverage.json
+pretty_print = True
+show_contexts = True
+
+[coverage:lcov]
+output = coverage.lcov
+
+[coverage:debug]
+trace = False
+config = False
+sys = False
