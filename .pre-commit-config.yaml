@@ -1,0 +1,186 @@
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+    -   id: trailing-whitespace
+    -   id: end-of-file-fixer
+    -   id: check-yaml
+    -   id: check-added-large-files
+    -   id: check-ast
+    -   id: check-byte-order-marker
+    -   id: check-case-conflict
+    -   id: check-docstring-first
+    -   id: check-executables-have-shebangs
+    -   id: check-json
+    -   id: check-merge-conflict
+    -   id: check-symlinks
+    -   id: check-toml
+    -   id: check-xml
+    -   id: debug-statements
+    -   id: detect-private-key
+    -   id: mixed-line-ending
+    -   id: requirements-txt-fixer
+
+-   repo: https://github.com/psf/black
+    rev: 23.7.0
+    hooks:
+    -   id: black
+        language_version: python3.10
+        args: [--line-length=100]
+
+-   repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+    -   id: isort
+        args: [--profile=black, --line-length=100]
+
+-   repo: https://github.com/pycqa/flake8
+    rev: 6.1.0
+    hooks:
+    -   id: flake8
+        additional_dependencies: [
+            'flake8-docstrings',
+            'flake8-quotes',
+            'flake8-bugbear',
+            'flake8-comprehensions',
+            'flake8-print',
+            'flake8-simplify',
+        ]
+        args: [
+            --max-line-length=100,
+            --extend-ignore=E203,
+        ]
+
+-   repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.4.1
+    hooks:
+    -   id: mypy
+        additional_dependencies: [
+            'types-requests',
+            'types-python-dateutil',
+            'types-PyYAML',
+            'django-stubs',
+            'djangorestframework-stubs',
+        ]
+        args: [
+            --ignore-missing-imports,
+            --disallow-untyped-defs,
+            --disallow-incomplete-defs,
+            --check-untyped-defs,
+            --disallow-untyped-decorators,
+            --no-implicit-optional,
+            --warn-redundant-casts,
+            --warn-unused-ignores,
+            --warn-return-any,
+            --strict-optional,
+            --strict-equality,
+        ]
+
+-   repo: https://github.com/PyCQA/bandit
+    rev: 1.7.5
+    hooks:
+    -   id: bandit
+        args: ['-ll', '-ii', '-x', 'tests']
+
+-   repo: https://github.com/PyCQA/pylint
+    rev: v3.0.0a7
+    hooks:
+    -   id: pylint
+        args: [
+            --disable=C0111,  # missing-docstring
+            --disable=C0103,  # invalid-name
+            --max-line-length=100,
+            --django-settings-module=breaksphere.settings,
+        ]
+        additional_dependencies: [
+            'pylint-django',
+            'pylint-celery',
+        ]
+
+-   repo: https://github.com/asottile/pyupgrade
+    rev: v3.10.1
+    hooks:
+    -   id: pyupgrade
+        args: [--py310-plus]
+
+-   repo: https://github.com/rtts/djhtml
+    rev: 3.0.6
+    hooks:
+    -   id: djhtml
+        args: [--tabwidth=2]
+
+-   repo: https://github.com/python-poetry/poetry
+    rev: 1.5.1
+    hooks:
+    -   id: poetry-check
+    -   id: poetry-lock
+    -   id: poetry-export
+        args: [
+            -f requirements.txt,
+            -o requirements.txt,
+            --without-hashes,
+        ]
+
+-   repo: local
+    hooks:
+    -   id: django-test
+        name: django-test
+        entry: python manage.py test
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [push]
+
+    -   id: check-migration-conflicts
+        name: check-migration-conflicts
+        entry: python manage.py makemigrations --check --dry-run
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [push]
+
+    -   id: check-model-errors
+        name: check-model-errors
+        entry: python manage.py check
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [push]
+
+    -   id: validate-templates
+        name: validate-templates
+        entry: python manage.py validate_templates
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [push]
+
+    -   id: check-security
+        name: check-security
+        entry: bandit -r . -ll -ii -x tests/
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [push]
+
+default_language_version:
+    python: python3.10
+
+exclude: |
+    (?x)^(
+        migrations/.*|
+        static/.*|
+        media/.*|
+        docs/.*|
+        \.git/.*|
+        \.tox/.*|
+        \.venv/.*|
+        node_modules/.*|
+        \.coverage|
+        coverage\.xml|
+        htmlcov/.*|
+        \.pytest_cache/.*|
+        \.mypy_cache/.*|
+        \.idea/.*|
+        \.vscode/.*
+    )$
