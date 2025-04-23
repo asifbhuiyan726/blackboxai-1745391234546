@@ -1,0 +1,203 @@
+# Use multi-stage build for development
+FROM python:3.10-slim as development
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    POETRY_VERSION=1.5.1 \
+    POETRY_HOME="/opt/poetry" \
+    POETRY_VIRTUALENVS_CREATE=false \
+    DJANGO_SETTINGS_MODULE=breaksphere.settings_dev
+
+# Set work directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    postgresql-client \
+    git \
+    curl \
+    vim \
+    less \
+    htop \
+    graphviz \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Poetry
+RUN curl -sSL https://install.python-poetry.org | python3 -
+ENV PATH="${POETRY_HOME}/bin:$PATH"
+
+# Copy poetry files
+COPY pyproject.toml poetry.lock ./
+
+# Install Python dependencies
+RUN poetry install --no-root --no-interaction --no-ansi --with dev
+
+# Install additional development tools
+RUN pip install --no-cache-dir \
+    ipython \
+    ipdb \
+    django-debug-toolbar \
+    django-extensions \
+    pytest-watch \
+    locust \
+    werkzeug \
+    pydevd-pycharm
+
+# Copy project files
+COPY . .
+
+# Create directories for static and media files
+RUN mkdir -p /app/staticfiles /app/media /app/logs
+
+# Create a non-root user
+RUN useradd -m appuser && chown -R appuser:appuser /app
+USER appuser
+
+# Development port
+EXPOSE 8000
+
+# Set up entrypoint script
+COPY scripts/dev-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/dev-entrypoint.sh
+
+# Default command (can be overridden in docker-compose)
+CMD ["/usr/local/bin/dev-entrypoint.sh"]
+
+# Development stage for Jupyter notebooks
+FROM development as jupyter
+
+# Install Jupyter dependencies
+RUN pip install --no-cache-dir \
+    jupyter \
+    jupyterlab \
+    jupyter-contrib-nbextensions \
+    jupyter-nbextensions-configurator \
+    ipywidgets
+
+# Enable Jupyter extensions
+RUN jupyter contrib nbextension install --user \
+    && jupyter nbextensions_configurator enable --user
+
+# Expose Jupyter port
+EXPOSE 8888
+
+# Development stage for documentation
+FROM development as docs
+
+# Install documentation dependencies
+RUN pip install --no-cache-dir \
+    sphinx \
+    sphinx-rtd-theme \
+    sphinx-autodoc-typehints \
+    sphinx-copybutton \
+    myst-parser \
+    doc8
+
+# Expose documentation port
+EXPOSE 7000
+
+# Development stage for testing
+FROM development as testing
+
+# Install testing dependencies
+RUN pip install --no-cache-dir \
+    pytest-xdist \
+    pytest-cov \
+    pytest-sugar \
+    pytest-watch \
+    factory-boy \
+    faker
+
+# Set environment variables for testing
+ENV DJANGO_SETTINGS_MODULE=breaksphere.settings_test \
+    PYTHONPATH=/app
+
+# Development stage for profiling
+FROM development as profiling
+
+# Install profiling tools
+RUN pip install --no-cache-dir \
+    line-profiler \
+    memory-profiler \
+    py-spy \
+    scalene
+
+# Allow profiling as root
+USER root
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health/ || exit 1
+
+# Development stage for debugging
+FROM development as debug
+
+# Install debugging tools
+RUN pip install --no-cache-dir \
+    debugpy \
+    django-debug-toolbar \
+    django-querycount \
+    django-silk
+
+# Expose debug port
+EXPOSE 5678
+
+# Configure remote debugging
+ENV PYTHONBREAKPOINT=debugpy.breakpoint \
+    DEBUGPY_WAIT_FOR_CLIENT=1
+
+# Development stage for load testing
+FROM development as loadtest
+
+# Install load testing tools
+RUN pip install --no-cache-dir \
+    locust \
+    apache-benchmark \
+    wrk
+
+# Expose Locust web interface
+EXPOSE 8089
+
+# Development stage for security testing
+FROM development as security
+
+# Install security testing tools
+RUN pip install --no-cache-dir \
+    bandit \
+    safety \
+    owasp-zap-api-python \
+    sslyze
+
+# Set up development environment
+ENV DJANGO_DEBUG=1 \
+    DJANGO_SETTINGS_MODULE=breaksphere.settings_dev \
+    PYTHONPATH=/app \
+    PYTHONBREAKPOINT=ipdb.set_trace \
+    DJANGO_COLORS=1
+
+# Create required directories
+RUN mkdir -p \
+    /app/logs \
+    /app/media \
+    /app/staticfiles \
+    /app/.pytest_cache \
+    /app/.coverage \
+    /app/htmlcov
+
+# Set permissions
+RUN chown -R appuser:appuser \
+    /app/logs \
+    /app/media \
+    /app/staticfiles \
+    /app/.pytest_cache \
+    /app/.coverage \
+    /app/htmlcov
+
+# Switch back to non-root user
+USER appuser
+
+# Command to run development server
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
