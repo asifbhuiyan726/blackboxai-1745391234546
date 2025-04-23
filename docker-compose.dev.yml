@@ -1,0 +1,171 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+      - ./static:/app/static
+      - ./media:/app/media
+    ports:
+      - "8000:8000"
+    environment:
+      - DJANGO_SETTINGS_MODULE=breaksphere.settings_dev
+      - DJANGO_DEBUG=True
+      - POSTGRES_DB=breaksphere_dev
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST=db
+      - REDIS_HOST=redis
+      - PYTHONPATH=/app
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - db
+      - redis
+    stdin_open: true
+    tty: true
+
+  db:
+    image: postgres:14-alpine
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=breaksphere_dev
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_dev:/data
+    command: redis-server --appendonly yes
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    command: celery -A breaksphere worker -l DEBUG
+    volumes:
+      - .:/app
+    environment:
+      - DJANGO_SETTINGS_MODULE=breaksphere.settings_dev
+      - DJANGO_DEBUG=True
+      - POSTGRES_DB=breaksphere_dev
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST=db
+      - REDIS_HOST=redis
+      - PYTHONPATH=/app
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - web
+      - redis
+
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    command: celery -A breaksphere beat -l DEBUG
+    volumes:
+      - .:/app
+    environment:
+      - DJANGO_SETTINGS_MODULE=breaksphere.settings_dev
+      - DJANGO_DEBUG=True
+      - POSTGRES_DB=breaksphere_dev
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST=db
+      - REDIS_HOST=redis
+      - PYTHONPATH=/app
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - web
+      - redis
+
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    command: celery -A breaksphere flower --port=5555
+    ports:
+      - "5555:5555"
+    environment:
+      - DJANGO_SETTINGS_MODULE=breaksphere.settings_dev
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    depends_on:
+      - celery_worker
+      - redis
+
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@breaksphere.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - "1025:1025"  # SMTP server
+      - "8025:8025"  # Web UI
+
+  jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    command: python manage.py shell_plus --notebook
+    volumes:
+      - .:/app
+    ports:
+      - "8888:8888"
+    environment:
+      - DJANGO_SETTINGS_MODULE=breaksphere.settings_dev
+      - PYTHONPATH=/app
+    depends_on:
+      - web
+
+  docs:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    command: sphinx-autobuild docs docs/_build/html --host 0.0.0.0 --port 7000
+    volumes:
+      - .:/app
+    ports:
+      - "7000:7000"
+
+  redis-commander:
+    image: rediscommander/redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+
+volumes:
+  postgres_data_dev:
+  redis_data_dev:
+
+networks:
+  default:
+    driver: bridge
